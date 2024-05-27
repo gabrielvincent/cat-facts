@@ -1,0 +1,98 @@
+package components
+
+import "strconv"
+import "crypto/rand"
+import "encoding/base64"
+
+templ layout() {
+	<!DOCTYPE html>
+	<html>
+		<head>
+			<title>Cat Facts</title>
+			<link href="/tailwind.css" rel="stylesheet"/>
+			<script src="/lazy-component.js"></script>
+		</head>
+		<body>
+			<main>
+				{ children... }
+			</main>
+		</body>
+	</html>
+}
+
+script loadLazyComponent(lazyID string, elementID string) {
+    window.loadLazyComponent(lazyID, elementID)
+}
+
+func generateLazyElementID() (string, error) {
+	length := 12
+	nBytes := length * 3 / 4
+
+	randomBytes := make([]byte, nBytes)
+
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return "", err
+	}
+
+	randomString := base64.URLEncoding.EncodeToString(randomBytes)
+
+	return randomString[:length], nil
+}
+
+templ LazyComponent(lazyID string, fallback templ.Component) {
+	if fallback == nil {
+		{{ elementID, err := generateLazyElementID() }}
+		if err != nil {
+			<div>Error</div>
+		}
+		<div id={ elementID }>
+			{ children... }
+		</div>
+		@loadLazyComponent(lazyID, elementID)
+	} else {
+		<div
+			data-lazy-id={ lazyID }
+		>
+			@fallback
+		</div>
+	}
+}
+
+templ Fact(fact string, factNum int) {
+	<li class="flex items-center gap-4">
+		<span class="fact-number font-semibold">{ strconv.Itoa(factNum) }{ "." }</span>
+		<span>
+			{ fact }
+		</span>
+	</li>
+}
+
+templ FactsLoading() {
+	<span>Carregando...</span>
+}
+
+templ Facts(facts []string) {
+	if facts == nil {
+		@LazyComponent("facts", FactsLoading())
+	} else {
+		@LazyComponent("facts", nil) {
+			<ul id="facts-list" class="w-full flex flex-col gap-2">
+				if facts != nil {
+					for idx, fact := range facts {
+						@Fact(fact, idx+1)
+					}
+				}
+			</ul>
+		}
+	}
+}
+
+templ Index(facts []string) {
+	@layout() {
+		<div class="p-8">
+			<h1 class="mb-4 font-bold text-3xl">Cat Facts</h1>
+			@Facts(facts)
+		</div>
+	}
+}
